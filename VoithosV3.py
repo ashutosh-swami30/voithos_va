@@ -20,9 +20,10 @@ from tqdm import tqdm
 class Voithos:
     def __init__(self):
         self.engine = pyttsx3.init()
-        self.model = whisper.load_model("base")
+        self.model = whisper.load_model("medium")
         self.sample_rate = 16000 #Whisper expects 16KHz audio
         self.recording_duration = 4
+        self.should_exit = False
     
     #To record the voice input
     def set_recording_duration(self, seconds):
@@ -51,10 +52,13 @@ class Voithos:
             print("Processing.....")
             res = self.model.transcribe(audio, language='english' , fp16 = torch.cuda.is_available())
             user_input = res["text"].lower().strip()
+            user_input = user_input.translate(str.maketrans('', '', string.punctuation))  # Remove punctuation
+            print(repr(user_input))
             
             print("You:",user_input)
-            if user_input in ['exit','quit','bye','end']:
+            if user_input in ['exit','quit','bye','end','goodbye','seeyou']:
                 self.speak("Goodbye!")
+                self.should_exit = True
                 return "Goodbye!"
             response = self.generate_response(user_input)
             print("Voithos:", response)
@@ -247,10 +251,12 @@ if not os.path.exists("file_index.json"):
     print("Building file index... This may take a few minutes.")
     voithos.build_file_index()
 
-    
-while True:
+while not voithos.should_exit:
+    voithos.listen_and_respond()
+     
+'''while True:
     response = voithos.listen_and_respond()
     if response == "Goodbye!":
-        break
+        break'''
         
         
