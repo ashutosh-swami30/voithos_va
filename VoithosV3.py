@@ -121,8 +121,19 @@ class Voithos:
     
     # Opens a website by attempting to construct a valid URL
     def open_website(self,site):
-        domain_variants = [".com",".org", ".net", ".in", ".io", ".ai"]
-        site = site.replace(" ", "").lower()
+        
+        site = site.strip().lower().replace(" ", "")
+        if '.' in site:
+            url = f"https://{site}"
+            try:
+                response = requests.head(url, timeout=3)
+                if response.status_code < 400:
+                    webbrowser.open(url)
+                    return f"Opening {url}"
+            except requests.RequestException:
+                return f"Sorry, {site} doesn't seem reachable."
+        
+        domain_variants = [".com",".org", ".net", ".in", ".io", ".ai",".to",".jp",".us",".uk"]
         for domain in domain_variants:
             url = f"https://www.{site}{domain}"
             try:
