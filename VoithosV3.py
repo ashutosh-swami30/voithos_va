@@ -14,6 +14,7 @@ import string
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import threading
+from tqdm import tqdm
 
 #Main class
 class Voithos:
@@ -109,7 +110,7 @@ class Voithos:
             results = self.web_search(query)
             if results:
                 response = f"Here are some results for '{query}':\n"
-                for result in results[:5]:  # Limiting to first 3 results for brevity
+                for result in results[:5]:  # Limiting to first 5 results for brevity
                     response += f"- {result['Text']} ({result['FirstURL']})\n"
                 return response
             else:
@@ -161,9 +162,12 @@ class Voithos:
             drive_index = {}
             try:
                 print(f"Indexing drive: {drive}")
+                file_list = []
                 for root, dirs, files in os.walk(drive):
                     dirs[:] = [d for d in dirs if d not in excluded_dirs and not d.startswith('$')]
+                    file_list.append((root, files, dirs))
                     
+                for root, files, dirs in tqdm(file_list, desc=f"{drive}"):
                     for name in files + dirs: 
                         key = name.lower()
                         full_path = os.path.join(root, name)
@@ -176,8 +180,8 @@ class Voithos:
         with ThreadPoolExecutor(max_workers=len(drives)) as executor:
             results = list(executor.map(process_drive,drives))
         
-        for drive, index in results:
-            for key, paths in process_drive.items():
+        for index in results:
+            for key, paths in index.items():
                 file_index.setdefault(key, []).extend(paths)
                 
         with open(index_path, "w", encoding="utf-8") as f:
