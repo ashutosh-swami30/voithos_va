@@ -33,6 +33,7 @@ class Voithos:
                 return "Duration cannot exceed 30 seconds."
             
             self.recording_duration = seconds
+            return f"Recording duration set to {seconds} seconds."
         except ValueError:
             return "Please provide a valid number of seconds."
 
@@ -72,7 +73,7 @@ class Voithos:
     def web_search(self, query):
         url = f"https://api.duckduckgo.com/?q={query}&format=json"
         try:
-            response = requests.get(url)
+            response = requests.get(url,timeout=10)
             data = response.json()
             results = data.get("RelatedTopics", [])
             return results
@@ -95,6 +96,7 @@ class Voithos:
             site = user_input.split("open")[-1].strip()
             return self.open_website(site)
 
+        #Sets recording time for voice input
         elif "set recording time" in user_input:
             words = user_input.split()
             for word in words:
@@ -107,7 +109,7 @@ class Voithos:
             results = self.web_search(query)
             if results:
                 response = f"Here are some results for '{query}':\n"
-                for result in results[:3]:  # Limiting to first 3 results for brevity
+                for result in results[:5]:  # Limiting to first 3 results for brevity
                     response += f"- {result['Text']} ({result['FirstURL']})\n"
                 return response
             else:
@@ -131,8 +133,8 @@ class Voithos:
                 continue
         return f"Sorry, I couldnt find a valid domain for the specified website"
     
+
     #get available drives
-    
     def get_available_drives(self):
         drives = []
         for drive in string.ascii_uppercase:
@@ -140,9 +142,10 @@ class Voithos:
                 drives.append(f"{drive}:\\")
         return drives
     
+    #allows users to select which drive to search in
     def prompt_user_for_drives(self):
         available_drives = self.get_available_drives()
-        print("Available drives:", ", ".join(available_drives))
+        print("Available drives are:", ", ".join(available_drives))
         self.speak("Available drives are "+ ", ".join(available_drives))
         
         
@@ -154,7 +157,34 @@ class Voithos:
         file_index = {}
         excluded_dirs = ["Windows", "Program Files", "Program Files (x86)", "ProgramData", "AppData"]
         
-        for drive in drives:
+        def process_drive(drive):
+            drive_index = {}
+            try:
+                print(f"Indexing drive: {drive}")
+                for root, dirs, files in os.walk(drive):
+                    dirs[:] = [d for d in dirs if d not in excluded_dirs and not d.startswith('$')]
+                    
+                    for name in files + dirs: 
+                        key = name.lower()
+                        full_path = os.path.join(root, name)
+                        drive_index.setdefault(key, []).append(full_path)
+            except Exception as e:
+                print(f"Error processing {drive}:{e}")
+            return drive_index
+        
+        
+        with ThreadPoolExecutor(max_workers=len(drives)) as executor:
+            results = list(executor.map(process_drive,drives))
+        
+        for drive, index in results:
+            for key, paths in process_drive.items():
+                file_index.setdefault(key, []).extend(paths)
+                
+        with open(index_path, "w", encoding="utf-8") as f:
+            json.dump(file_index, f)
+        print(f"File index built with {len(file_index)} unique names.")
+            
+        '''for drive in drives:
             print(f"Indexing drive: {drive}")
             for root, dirs, files in os.walk(drive):
                 #skips system folders
@@ -163,13 +193,10 @@ class Voithos:
                 for name in files + dirs: 
                     key = name.lower()
                     full_path = os.path.join(root, name)
-                    file_index.setdefault(key, []).append(full_path)
-        with open(index_path, "w", encoding="utf-8") as f:
-            json.dump(file_index, f)
-        print(f"File index built with {len(file_index)} unique names.")
+                    file_index.setdefault(key, []).append(full_path)'''
         
     #finds the file in the index
-    def find_in_index(file_name, index_path="file_index.json"):
+    def find_in_index(self, file_name, index_path="file_index.json"):
         file_name = file_name.lower()
         try:
             with open(index_path, "r", encoding='utf-8') as f:
@@ -186,7 +213,10 @@ class Voithos:
             matches = self.find_in_index(file_name)
             if matches:
                 path = matches[0]
-                os.startfile(path)
+                if os.name =='nt': #for windows
+                    os.startfile(path)
+                else:
+                    os.system(f"xdg-open '{path}'")
                 return f"Opening {file_name}"
             else:
                 return f"Sorry, I couldn't find the file {file_name}."
