@@ -20,7 +20,7 @@ from tqdm import tqdm
 class Voithos:
     def __init__(self):
         self.engine = pyttsx3.init()
-        self.model = whisper.load_model("medium")
+        self.model = whisper.load_model("small")
         self.sample_rate = 16000 #Whisper expects 16KHz audio
         self.recording_duration = 4
         self.should_exit = False
